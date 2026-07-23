@@ -22,6 +22,15 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
+    <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- FIREBASE ADD KARO YAHAN -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
+
+<script>
+  tailwind.config = {
     darkMode: 'class',
     theme: {
       extend: {
@@ -106,6 +115,13 @@
   .icon-swap { transition: opacity 0.2s ease, transform 0.2s ease; }
 </style>
 </head>
+  16 </style>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js"></script>
+
+17 </head>
 
 <body class="bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 transition-colors duration-300">
 
@@ -696,36 +712,37 @@ function bindAdminEvents() {
       showMsg('Please write a description.', true);
       return;
     }
+const title = deriveTitle(desc);
 
-    const posts = getPosts();
+if (editingId) {
+  // EDIT: Firebase me update karo
+  db.collection("posts").doc(editingId).update({
+    title: title,
+    content: desc,
+    image: pendingImageData || null,
+    date: new Date().toLocaleDateString('en-CA')
+  })
+ .then(()=>{
+    showMsg('Post updated!', false);
+    loadPosts();
+  })
+ .catch(e=>showMsg('Error: '+e.message, true));
+  
+} else {
+  // NEW POST: Firebase me add karo
+  savePostToFirebase(title, desc);
+}
 
-    if (editingId) {
-      const idx = posts.findIndex(p => p.id === editingId);
-      if (idx > -1) {
-        posts[idx].excerpt = desc.length > 130 ? desc.slice(0, 130).trim() + '…' : desc;
-        posts[idx].content = desc;
-        posts[idx].title = deriveTitle(desc);
-        if (pendingImageData) posts[idx].image = pendingImageData;
-      }
-    } else {
-      const newPost = {
-        id: 'p' + Date.now(),
-        title: deriveTitle(desc),
-        date: new Date().toISOString().slice(0, 10),
-        image: pendingImageData,
-        excerpt: desc.length > 130 ? desc.slice(0, 130).trim() + '…' : desc,
-        content: desc
-      };
-      posts.unshift(newPost);
-    }
-
-    savePosts(posts);
-    resetForm();
-    showMsg(editingId ? 'Post updated successfully.' : 'Post published successfully.', false);
-    document.getElementById('postsList').innerHTML = renderPostsListOnly();
-    bindPostListButtons();
-  });
-
+// form reset
+editingIdField.value = '';
+postDesc.value = '';
+pendingImageData = null;
+imagePreviewWrap.classList.add('hidden');
+formTitle.textContent = 'Add New Post';
+submitBtn.textContent = 'Publish Post';
+cancelEditBtn.classList.add('hidden');
+    
+}); // <-- ye form submit ka end hai
   function deriveTitle(desc) {
     const words = desc.split(/\s+/).slice(0, 9).join(' ');
     return words.length < desc.length ? words + '…' : words;
@@ -742,56 +759,96 @@ function bindAdminEvents() {
   }
 
   cancelEditBtn.addEventListener('click', resetForm);
-
-  function renderPostsListOnly() {
-    const posts = getPosts().slice().sort((a, b) => new Date(b.date) - new Date(a.date));
-    if (!posts.length) return '<p class="text-neutral-500 text-sm">No posts yet. Create your first one above.</p>';
-    return posts.map(p => `
-      <div class="flex items-center gap-4 rounded-xl border border-neutral-100 dark:border-neutral-800 p-3" data-post-row="${p.id}">
-        <img src="${p.image}" alt="" class="w-16 h-16 rounded-lg object-cover flex-shrink-0 bg-neutral-100 dark:bg-neutral-800">
-        <div class="flex-1 min-w-0">
-          <p class="font-semibold truncate">${escapeHtml(p.title)}</p>
-          <p class="text-xs text-neutral-400">${formatDate(p.date)}</p>
-        </div>
-        <button data-edit="${p.id}" class="text-sm font-semibold text-neutral-500 hover:text-brand px-2">Edit</button>
-        <button data-delete="${p.id}" class="text-sm font-semibold text-brand hover:text-brand-dark px-2">Delete</button>
+  
+    function renderPostsListOnly(posts) {
+  if (!posts.length) return `<p class="text-neutral-500 text-sm">No posts yet</p>`;
+  return posts.map(p => `
+    <div class="flex items-center gap-4 rounded-xl border-neutral-100 p-3">
+      <img src="${p.image || ''}" alt="" class="w-16 h-16 rounded-lg object-cover ${p.image ? '' : 'hidden'}">
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold truncate">${escapeHtml(p.title)}</p>
+        <p class="text-xs text-neutral-400">${formatDate(p.date)}</p>
       </div>
-    `).join('');
+      <button data-edit="${p.id}" class="text-sm font-semibold text-neutral-600 hover:text-black">Edit</button>
+      <button data-delete="${p.id}" class="text-sm font-semibold text-brand-red hover:underline">Delete</button>
+    </div>
+  `).join('');
   }
-
-  function bindPostListButtons() {
-    document.querySelectorAll('[data-edit]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const post = getPosts().find(p => p.id === btn.dataset.edit);
-        if (!post) return;
-        editingIdField.value = post.id;
+      function bindPostListButtons() {
+  document.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const postId = btn.dataset.edit;
+      db.collection("posts").doc(postId).get().then(doc => {
+        if (!doc.exists) return;
+        const post = doc.data();
+        editingIdField.value = postId;
         postDesc.value = post.content;
-        imagePreview.src = post.image;
-        imagePreviewWrap.classList.remove('hidden');
-        pendingImageData = null; // keep existing image unless replaced
+        if(post.image){
+          imagePreview.src = post.image;
+          imagePreviewWrap.classList.remove('hidden');
+        }
+        pendingImageData = post.image;
         formTitle.textContent = 'Edit Post';
         submitBtn.textContent = 'Save Changes';
         cancelEditBtn.classList.remove('hidden');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
-    document.querySelectorAll('[data-delete]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (!confirm('Delete this post? This cannot be undone.')) return;
-        const posts = getPosts().filter(p => p.id !== btn.dataset.delete);
-        savePosts(posts);
-        document.getElementById('postsList').innerHTML = renderPostsListOnly();
-        bindPostListButtons();
+  document.querySelectorAll('[data-delete]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm('Delete this post? This cannot be undone.')) return;
+      const postId = btn.dataset.delete;
+      db.collection("posts").doc(postId).delete()
+      .then(()=>{
         showMsg('Post deleted.', false);
-      });
+        loadPosts(); // list refresh hogi
+      })
+      .catch(e=>showMsg('Error: '+e.message, true));
     });
+  });
   }
-
   bindPostListButtons();
+}
+function loadPosts(){
+  db.collection("posts").orderBy("date","desc").get()
+  .then(snapshot=>{
+    const posts = [];
+    snapshot.forEach(doc=>{
+      posts.push({id: doc.id, ...doc.data()});
+    });
+    renderPostsListOnly(posts); // <-- ye karo
+  })
+  .catch(e=>showMsg('Error loading posts: '+e.message, true));}
+}
+function savePostToFirebase(title, content){
+  db.collection("posts").add({
+    title: title,
+    content: content,
+    image: pendingImageData || null, // <-- 1. ye add karo
+    date: new Date().toLocaleDateString('en-CA')
+  })
+  .then(()=>{
+    showMsg('Post saved!', false);
+    loadPosts();
+    resetForm(); // <-- 2. ye add karo
+  })
+  .catch(e=>showMsg('Error saving: '+e.message, true));
 }
 
 /* ---------------- Boot ---------------- */
-render(); // shows default posts instantly; Firestore listener above refreshes with live shared data
+loadPosts(); // Firebase se posts load karega
+ const firebaseConfig = {
+apiKey: "AIzaSyDPmJHNYma7ABS14opsm-AkYfrPIO5pb0o"
+authDomain: "asad-205ca.firebaseapp.com"
+projectId: "asad-205ca"
+storageBucket: "asad-205ca.firebasestorage.app"
+messagingSenderId: "962789422037"
+appId: "1:962789422037:web:7e6f3a9435b254b37a435c"
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+  })
 </script>
 </body>
 </html>
+
