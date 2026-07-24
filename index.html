@@ -85,7 +85,7 @@
 
 <header class="sticky top-0 z-30 bg-white/90 dark:bg-[#150c0e]/90 backdrop-blur border-b border-brick/10 dark:border-ember/20">
   <div class="max-w-6xl mx-auto px-4 md:px-6 py-3.5 flex items-center justify-between gap-3">
-    <span class="font-display text-xl font-bold text-brick dark:text-ember">Asad Blogs</span>
+    <span class="font-display text-xl font-bold text-brick dark:text-ember">Asad's Blogs</span>
 
     <div class="flex items-center gap-2">
       <button id="themeToggleBtn" aria-label="Toggle dark mode" class="w-10 h-10 shrink-0 rounded-full border border-brick/30 dark:border-ember/30 flex items-center justify-center text-brick dark:text-ember hover:bg-brick/10 dark:hover:bg-ember/10 transition-colors">
@@ -694,7 +694,7 @@
     if (likeInFlight) return;
     const uid = await ensureUid();
     if (!uid) {
-      alert("Likes are temporarily unavailable. Please try again in a moment.");
+      alert("You already Liked the Post!.");
       return;
     }
     const postRef = blogsRef.doc(postId);
